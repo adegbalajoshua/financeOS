@@ -1,0 +1,248 @@
+<script>
+/**
+ * ============================================================================
+ * UI Components & Template Generators
+ * ============================================================================
+ */
+
+'use strict';
+
+const Components = {
+
+  renderAll(payload) {
+    if (!payload || payload.error) return;
+
+    const currency = (payload.settings && payload.settings['Currency']) ? payload.settings['Currency'] : '₦';
+
+    this.renderKPIs(payload.kpis, currency);
+    this.renderBudget(payload.expenses, currency);
+    this.renderTimeline(payload.receivableList, currency); 
+    this.renderAccounts(payload.accounts, currency);
+    this.renderSavings(payload.savings, currency);
+    this.renderReceivables(payload.receivableList, currency);
+  },
+
+  formatCurrency(amount, currencySymbol = '₦') {
+    return `${currencySymbol}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  },
+
+  formatCompactCurrency(amount, currencySymbol = '₦') {
+    if (amount >= 1000000) {
+      return `${currencySymbol}${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      return `${currencySymbol}${(amount / 1000).toFixed(1)}K`;
+    }
+    return this.formatCurrency(amount, currencySymbol);
+  },
+
+  renderKPIs(kpis, currency) {
+    const container = document.getElementById('kpi-container');
+    if (!container) return;
+
+    const cards = [
+      { id: 'income', label: 'Income', value: kpis.income, icon: 'arrow-down-left', color: 'success' },
+      { id: 'spent', label: 'Spent', value: kpis.spent, icon: 'arrow-up-right', color: 'danger' },
+      { id: 'liquid', label: 'Liquid Cash', value: kpis.liquidCash, icon: 'coins', color: 'primary' },
+      { id: 'receivables', label: 'Receivables', value: kpis.receivables, icon: 'clock', color: 'warning' },
+      { id: 'charges', label: 'Bank Charges', value: kpis.bankCharges, icon: 'receipt', color: 'slate' }
+    ];
+
+    container.innerHTML = cards.map(card => `
+      <div class="glass-card p-5 flex flex-col justify-between gap-3 group stagger-item opacity-0">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-lg bg-${card.color}/10 text-${card.color} group-hover:scale-110 transition-transform duration-300">
+            <i data-lucide="${card.icon}" class="w-5 h-5"></i>
+          </div>
+          <span class="text-sm font-medium text-slate-500 dark:text-slate-400">${card.label}</span>
+        </div>
+        <div>
+          <h3 class="text-2xl font-bold text-slate-900 dark:text-white" 
+              data-counter="${card.value}" 
+              data-currency="${currency}">
+              ${currency}0
+          </h3>
+        </div>
+      </div>
+    `).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  },
+
+  renderBudget(expenses, currency) {
+    const container = document.getElementById('budget-container');
+    if (!container) return;
+
+    if (!expenses || expenses.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic">No budget data available for this cycle.</p>`;
+      return;
+    }
+
+    container.innerHTML = expenses.map(exp => {
+      let colorClass = 'bg-success';
+      let textClass = 'text-success';
+      
+      if (exp.percentUsed >= 90) {
+        colorClass = 'bg-danger';
+        textClass = 'text-danger';
+      } else if (exp.percentUsed >= 75) {
+        colorClass = 'bg-warning';
+        textClass = 'text-warning';
+      }
+
+      return `
+        <div class="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 hover:shadow-md transition-all stagger-item opacity-0">
+          <div class="flex justify-between items-end mb-2">
+            <div>
+              <h4 class="font-semibold text-slate-800 dark:text-slate-200">${exp.category}</h4>
+              <p class="text-xs text-slate-500 mt-0.5">
+                ${this.formatCompactCurrency(exp.spent, currency)} / ${this.formatCompactCurrency(exp.budget, currency)}
+              </p>
+            </div>
+            <span class="text-sm font-bold ${textClass}">${exp.percentUsed}%</span>
+          </div>
+          <div class="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div class="h-full rounded-full ${colorClass} transition-all duration-1000 ease-out" 
+                 style="width: 0%" 
+                 data-progress="${Math.min(exp.percentUsed, 100)}"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  renderAccounts(accounts, currency) {
+    const container = document.getElementById('accounts-container');
+    if (!container) return;
+
+    if (!accounts || accounts.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic">No active accounts found.</p>`;
+      return;
+    }
+
+    container.innerHTML = accounts.map(acc => `
+      <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer stagger-item opacity-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+            <i data-lucide="building-2" class="w-5 h-5"></i>
+          </div>
+          <span class="font-medium text-slate-800 dark:text-slate-200">${acc.name}</span>
+        </div>
+        <span class="font-semibold text-slate-900 dark:text-white">${this.formatCurrency(acc.balance, currency)}</span>
+      </div>
+    `).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  },
+
+  renderSavings(savings, currency) {
+    const container = document.getElementById('savings-container');
+    if (!container) return;
+
+    if (!savings || savings.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic">No savings targets set.</p>`;
+      return;
+    }
+
+    container.innerHTML = savings.map(save => `
+       <div class="stagger-item opacity-0">
+          <div class="flex justify-between items-end mb-1.5">
+            <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300">${save.category}</h4>
+            <span class="text-xs font-semibold text-primary">${save.percentUsed}%</span>
+          </div>
+          <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-primary rounded-full transition-all duration-1000 ease-out" 
+                 style="width: 0%" 
+                 data-progress="${Math.min(save.percentUsed, 100)}"></div>
+          </div>
+          <p class="text-xs text-slate-400 mt-1 text-right">${this.formatCompactCurrency(save.spent, currency)} saved</p>
+        </div>
+    `).join('');
+  },
+
+  renderReceivables(receivables, currency) {
+    const container = document.getElementById('receivables-container');
+    if (!container) return;
+
+    if (!receivables || receivables.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic">No outstanding receivables.</p>`;
+      return;
+    }
+
+    container.innerHTML = receivables.map(rec => `
+      <div class="flex items-center justify-between p-2 rounded-lg hover:bg-warning/5 dark:hover:bg-warning/10 transition-colors stagger-item opacity-0">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-warning"></div>
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-300">${rec.desc}</span>
+        </div>
+        <span class="text-sm font-semibold text-slate-900 dark:text-white">${this.formatCompactCurrency(rec.amount, currency)}</span>
+      </div>
+    `).join('');
+  },
+
+  renderTimeline(items, currency) {
+    const container = document.getElementById('timeline-container');
+    if (!container) return;
+
+    if (!items || items.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic pl-4">No recent activity.</p>`;
+      return;
+    }
+
+    container.innerHTML = items.slice(0, 5).map((item, index) => {
+      const isIncome = index % 2 === 0; 
+      const color = isIncome ? 'success' : 'danger';
+      const prefix = isIncome ? '+' : '-';
+
+      return `
+      <div class="relative pl-6 stagger-item opacity-0">
+        <div class="absolute -left-[5px] top-1 w-[9px] h-[9px] rounded-full bg-${color} border-2 border-white dark:border-dark shadow-sm"></div>
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">${item.desc}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Recent</p>
+          </div>
+          <span class="text-sm font-bold text-${color}">${prefix}${this.formatCurrency(item.amount, currency)}</span>
+        </div>
+      </div>
+    `}).join('');
+  },
+
+  showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    let colors = 'bg-slate-800 text-white';
+    let icon = 'info';
+
+    if (type === 'success') {
+      colors = 'bg-success text-white';
+      icon = 'check-circle';
+    } else if (type === 'error') {
+      colors = 'bg-danger text-white';
+      icon = 'alert-circle';
+    }
+
+    toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl transition-all duration-300 transform translate-y-10 opacity-0 ${colors}`;
+    toast.innerHTML = `
+      <i data-lucide="${icon}" class="w-5 h-5"></i>
+      <span class="text-sm font-medium tracking-wide">${message}</span>
+    `;
+
+    container.appendChild(toast);
+    if (window.lucide) window.lucide.createIcons({root: toast});
+
+    requestAnimationFrame(() => {
+      toast.classList.remove('translate-y-10', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+    });
+
+    setTimeout(() => {
+      toast.classList.remove('translate-y-0', 'opacity-100');
+      toast.classList.add('translate-y-4', 'opacity-0');
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+};
+</script>

@@ -1,0 +1,350 @@
+<script>
+/**
+ * ============================================================================
+ * Core Application Logic & State Management
+ * ============================================================================
+ */
+
+'use strict';
+
+const App = {
+
+  state: {
+    payload: null,
+    isFetching: false,
+    theme: 'light',
+    hasInitialized: false,
+    modalOpen: false
+  },
+
+  async init() {
+    this.initTheme();
+    this.initFAB();
+    this.initModal();
+    this.bindEvents();
+    
+    await this.fetchData();
+  },
+
+  bindEvents() {
+    const themeBtn = document.getElementById('theme-toggle');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => this.toggleTheme());
+    }
+
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        if (this.state.isFetching) return;
+        const icon = refreshBtn.querySelector('i');
+        icon.classList.add('animate-spin');
+        this.fetchData(true).finally(() => icon.classList.remove('animate-spin'));
+      });
+    }
+  },
+
+  //==========================================================================
+  // Data Fetching
+  //==========================================================================
+
+  async fetchData(forceRefresh = false) {
+    this.state.isFetching = true;
+
+    try {
+      let response;
+      if (forceRefresh) {
+        response = await this.serverCall('forceRefreshDashboard');
+      } else {
+        response = await this.serverCall('fetchDashboardPayload');
+      }
+
+      if (response.error) throw new Error(response.message);
+
+      this.state.payload = response;
+      this.render();
+
+    } catch (error) {
+      console.error('FinanceOS Fetch Error:', error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to load data', 'error');
+      }
+    } finally {
+      this.state.isFetching = false;
+      this.removeInitialLoader();
+    }
+  },
+
+  serverCall(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || typeof google.script === 'undefined') {
+        reject(new Error('Google Apps Script environment not detected.'));
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
+  },
+
+  //==========================================================================
+  // Rendering
+  //==========================================================================
+
+  render() {
+    if (!this.state.payload) return;
+
+    const subtitle = document.getElementById('cycle-subtitle');
+    if (subtitle) {
+      subtitle.textContent = `Cycle: ${this.state.payload.cycle}`;
+    }
+
+    // Set Modal Currency Symbol
+    const currency = (this.state.payload.settings && this.state.payload.settings['Currency']) ? this.state.payload.settings['Currency'] : '₦';
+    const modalCurrency = document.getElementById('modal-currency');
+    if (modalCurrency) modalCurrency.textContent = currency;
+
+    if (typeof Components !== 'undefined') {
+      Components.renderAll(this.state.payload);
+    }
+    
+    if (typeof Charts !== 'undefined') {
+      Charts.renderAll(this.state.payload, this.state.theme);
+    }
+
+    if (typeof Animations !== 'undefined' && !this.state.hasInitialized) {
+      setTimeout(() => {
+        Animations.staggerEntrance();
+        this.state.hasInitialized = true;
+      }, 50);
+    }
+  },
+
+  removeInitialLoader() {
+    const loader = document.getElementById('app-loader');
+    const mainContent = document.getElementById('main-content');
+    
+    if (loader && !loader.classList.contains('hidden')) {
+      loader.classList.add('opacity-0');
+      if (mainContent) mainContent.classList.remove('opacity-0');
+      setTimeout(() => loader.classList.add('hidden'), 500);
+    }
+  },
+
+  //==========================================================================
+  // UI & Interactions
+  //==========================================================================
+
+  initTheme() {
+    const savedTheme = localStorage.getItem('financeos_theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      document.documentElement.classList.add('dark');
+      this.state.theme = 'dark';
+    } else {
+      document.documentElement.classList.remove('dark');
+      this.state.theme = 'light';
+    }
+  },
+
+  toggleTheme() {
+    const html = document.documentElement;
+    html.classList.toggle('dark');
+    this.state.theme = html.classList.contains('dark') ? 'dark' : 'light';
+    localStorage.setItem('financeos_theme', this.state.theme);
+
+    if (typeof Charts !== 'undefined' && this.state.payload) {
+      Charts.updateTheme(this.state.theme);
+    }
+  },
+
+  initFAB() {
+    const fabMain = document.getElementById('fab-main');
+    const fabMenu = document.getElementById('fab-menu');
+    const fabIcon = document.getElementById('fab-icon');
+    let isOpen = false;
+
+    if (!fabMain || !fabMenu) return;
+
+    const toggleMenu = () => {
+      isOpen = !isOpen;
+      if (isOpen) {
+        fabMenu.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+        fabIcon.style.transform = 'rotate(45deg)';
+      } else {
+        fabMenu.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+        fabIcon.style.transform = 'rotate(0deg)';
+      }
+    };
+
+    fabMain.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+    
+    document.addEventListener('click', (e) => {
+      if (isOpen && !fabMenu.contains(e.target) && !fabMain.contains(e.target)) toggleMenu();
+    });
+
+    // Attach Modal triggers to FAB buttons
+    document.getElementById('btn-add-expense')?.addEventListener('click', () => { toggleMenu(); this.openModal('Expense'); });
+    document.getElementById('btn-add-income')?.addEventListener('click', () => { toggleMenu(); this.openModal('Income'); });
+    document.getElementById('btn-transfer')?.addEventListener('click', () => { toggleMenu(); this.openModal('Transfer'); });
+  },
+
+  //==========================================================================
+  // Modal & Form Logic
+  //==========================================================================
+
+  initModal() {
+    const backdrop = document.getElementById('modal-backdrop');
+    const closeBtn = document.getElementById('btn-close-modal');
+    const form = document.getElementById('transaction-form');
+
+    backdrop?.addEventListener('click', () => this.closeModal());
+    closeBtn?.addEventListener('click', () => this.closeModal());
+    
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.submitTransaction();
+    });
+  },
+
+  openModal(type) {
+    if (!this.state.payload) return;
+
+    const modal = document.getElementById('transaction-modal');
+    const panel = document.getElementById('modal-panel');
+    const title = document.getElementById('modal-title');
+    const typeInput = document.getElementById('tx-type');
+    const targetContainer = document.getElementById('transfer-target-container');
+    const toAccountInput = document.getElementById('tx-to-account');
+
+    // Reset Form
+    document.getElementById('transaction-form').reset();
+
+    // Set UI State
+    title.textContent = `Add ${type}`;
+    typeInput.value = type;
+
+    // Handle Transfer specific fields
+    if (type === 'Transfer') {
+      targetContainer.classList.remove('hidden');
+      toAccountInput.required = true;
+    } else {
+      targetContainer.classList.add('hidden');
+      toAccountInput.required = false;
+      toAccountInput.value = '';
+    }
+
+    this.populateModalDropdowns(type);
+
+    // Animate In
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+      panel.classList.remove('scale-95');
+      panel.classList.add('scale-100');
+    }, 10);
+    
+    this.state.modalOpen = true;
+    
+    // Auto-focus amount
+    setTimeout(() => document.getElementById('tx-amount').focus(), 100);
+  },
+
+  closeModal() {
+    const modal = document.getElementById('transaction-modal');
+    const panel = document.getElementById('modal-panel');
+
+    // Animate Out
+    panel.classList.remove('scale-100');
+    panel.classList.add('scale-95');
+    
+    setTimeout(() => {
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      this.state.modalOpen = false;
+    }, 200);
+  },
+
+  populateModalDropdowns(type) {
+    const categorySelect = document.getElementById('tx-category');
+    const accountSelect = document.getElementById('tx-account');
+    const toAccountSelect = document.getElementById('tx-to-account');
+
+    // 1. Populate Categories based on Type
+    let categories = [];
+    if (type === 'Expense') {
+      categories = this.state.payload.expenses.map(e => e.category);
+      if (categories.length === 0) categories = ['General', 'Food', 'Transport'];
+    } else if (type === 'Income') {
+      categories = ['Salary', 'Business', 'Investment', 'Other'];
+    } else if (type === 'Transfer') {
+      categories = ['Internal Transfer'];
+    }
+
+    categorySelect.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+
+    // 2. Populate Accounts
+    const accounts = this.state.payload.accounts.map(a => a.name);
+    const accountOptions = accounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
+    
+    accountSelect.innerHTML = accountOptions;
+    if (toAccountSelect) {
+      toAccountSelect.innerHTML = `<option value="" disabled selected>Select destination...</option>` + accountOptions;
+    }
+  },
+
+  async submitTransaction() {
+    const submitBtn = document.getElementById('btn-submit-tx');
+    const spinner = document.getElementById('submit-spinner');
+    const text = document.getElementById('submit-text');
+
+    // Gather Data
+    const formData = {
+      type: document.getElementById('tx-type').value,
+      amount: document.getElementById('tx-amount').value,
+      description: document.getElementById('tx-desc').value,
+      category: document.getElementById('tx-category').value,
+      account: document.getElementById('tx-account').value,
+      toAccount: document.getElementById('tx-to-account').value || '',
+      date: new Date().toISOString()
+    };
+
+    if (formData.type === 'Transfer' && formData.account === formData.toAccount) {
+      Components.showToast('Source and Destination accounts must be different', 'error');
+      return;
+    }
+
+    // UI Loading State
+    submitBtn.disabled = true;
+    spinner.classList.remove('hidden');
+    text.textContent = 'Saving...';
+
+    try {
+      // Send to Backend
+      const response = await this.serverCall('submitNewTransaction', formData);
+      
+      if (response.error) throw new Error(response.message);
+
+      // Success
+      this.closeModal();
+      Components.showToast('Transaction saved successfully', 'success');
+      
+      // Refresh Data in the background
+      const refreshIcon = document.getElementById('refresh-btn')?.querySelector('i');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+      this.fetchData(true).finally(() => refreshIcon?.classList.remove('animate-spin'));
+
+    } catch (error) {
+      Components.showToast(error.message || 'Failed to save transaction', 'error');
+    } finally {
+      // Reset UI
+      submitBtn.disabled = false;
+      spinner.classList.add('hidden');
+      text.textContent = 'Save Transaction';
+    }
+  }
+
+};
+
+document.addEventListener('DOMContentLoaded', () => App.init());
+</script>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinanceOS</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/motion@11.11.13/dist/motion.js"></script>
+
+  <?!= HtmlService.createHtmlOutputFromFile('dashboard.css').getContent(); ?>
+</head>
+
+<body class="bg-background dark:bg-dark text-slate-800 dark:text-slate-200 min-h-screen relative overflow-x-hidden">
+
+  <div id="app-loader" class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 dark:bg-dark/80 backdrop-blur-xl transition-opacity duration-500">
+    <div class="flex flex-col items-center gap-6">
+      <div class="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      <p class="text-sm font-medium text-slate-500 dark:text-slate-400 tracking-wide animate-pulse">Initializing FinanceOS...</p>
+    </div>
+  </div>
+
+  <main id="main-content" class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8 opacity-0 pb-32">
+
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30">
+          <i data-lucide="wallet" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">FinanceOS</h1>
+          <p id="cycle-subtitle" class="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">Fetching cycle data...</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-4">
+        <button id="theme-toggle" class="p-2.5 rounded-xl glass-card text-slate-600 dark:text-slate-300 focus:outline-none" aria-label="Toggle Dark Mode">
+          <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+          <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+        </button>
+        <button id="refresh-btn" class="p-2.5 rounded-xl glass-card text-slate-600 dark:text-slate-300 focus:outline-none" aria-label="Refresh Data">
+          <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <section id="kpi-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="glass-card p-6 h-28 animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+      <div class="glass-card p-6 h-28 animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+      <div class="glass-card p-6 h-28 animate-pulse bg-slate-200/50 dark:bg-slate-800/50 hidden md:block"></div>
+      <div class="glass-card p-6 h-28 animate-pulse bg-slate-200/50 dark:bg-slate-800/50 hidden lg:block"></div>
+      <div class="glass-card p-6 h-28 animate-pulse bg-slate-200/50 dark:bg-slate-800/50 hidden lg:block"></div>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <div class="lg:col-span-2 flex flex-col gap-6">
+        <section class="glass-panel p-6 h-[400px] flex flex-col">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Cash Flow</h2>
+          </div>
+          <div id="chart-cashflow" class="flex-grow w-full"></div>
+        </section>
+
+        <section class="glass-panel p-6">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Budget Utilization</h2>
+          <div id="budget-container" class="flex flex-col gap-4">
+            <div class="h-16 rounded-xl animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+            <div class="h-16 rounded-xl animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+            <div class="h-16 rounded-xl animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+          </div>
+        </section>
+
+        <section class="glass-panel p-6">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Recent Activity</h2>
+          <div id="timeline-container" class="relative pl-4 border-l border-slate-200 dark:border-slate-700 flex flex-col gap-6">
+            <div class="h-12 w-full animate-pulse bg-slate-200/50 dark:bg-slate-800/50 rounded-lg"></div>
+            <div class="h-12 w-3/4 animate-pulse bg-slate-200/50 dark:bg-slate-800/50 rounded-lg"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="flex flex-col gap-6">
+        <section class="glass-panel p-6 h-[340px] flex flex-col">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Spending Breakdown</h2>
+          <div id="chart-expense-donut" class="flex-grow w-full flex items-center justify-center"></div>
+        </section>
+
+        <section class="glass-panel p-6">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Accounts</h2>
+          <div id="accounts-container" class="flex flex-col gap-3">
+             <div class="h-16 rounded-xl animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+             <div class="h-16 rounded-xl animate-pulse bg-slate-200/50 dark:bg-slate-800/50"></div>
+          </div>
+        </section>
+
+        <section class="glass-panel p-6">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Savings Progress</h2>
+          <div id="savings-container" class="flex flex-col gap-4 mb-8">
+            </div>
+
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Receivables</h2>
+          <div id="receivables-container" class="flex flex-col gap-3">
+            </div>
+        </section>
+      </div>
+
+    </div>
+
+  </main>
+
+  <div class="fixed bottom-8 right-8 z-40 flex flex-col-reverse items-end gap-3" id="fab-container">
+    <button id="fab-main" class="w-14 h-14 rounded-2xl bg-primary text-white shadow-lg shadow-primary/40 flex items-center justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300 focus:outline-none">
+      <i data-lucide="plus" class="w-6 h-6 transition-transform duration-300" id="fab-icon"></i>
+    </button>
+    
+    <div id="fab-menu" class="flex flex-col items-end gap-3 opacity-0 pointer-events-none translate-y-4 transition-all duration-300 origin-bottom">
+      <button id="btn-add-expense" class="flex items-center gap-3 px-4 py-2.5 rounded-xl glass-card text-sm font-medium hover:text-danger hover:border-danger/30 group">
+        <span>Add Expense</span>
+        <div class="p-1.5 rounded-lg bg-danger/10 text-danger group-hover:bg-danger group-hover:text-white transition-colors"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></div>
+      </button>
+      <button id="btn-add-income" class="flex items-center gap-3 px-4 py-2.5 rounded-xl glass-card text-sm font-medium hover:text-success hover:border-success/30 group">
+        <span>Add Income</span>
+        <div class="p-1.5 rounded-lg bg-success/10 text-success group-hover:bg-success group-hover:text-white transition-colors"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></div>
+      </button>
+      <button id="btn-transfer" class="flex items-center gap-3 px-4 py-2.5 rounded-xl glass-card text-sm font-medium hover:text-primary hover:border-primary/30 group">
+        <span>Transfer</span>
+        <div class="p-1.5 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors"><i data-lucide="arrow-right-left" class="w-4 h-4"></i></div>
+      </button>
+    </div>
+  </div>
+
+  <div id="transaction-modal" class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+    <div id="modal-backdrop" class="absolute inset-0 bg-slate-900/40 dark:bg-slate-900/60 backdrop-blur-sm cursor-pointer"></div>
+    
+    <div id="modal-panel" class="relative w-full max-w-md mx-4 bg-white dark:bg-slate-850 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 transform scale-95 transition-all duration-300">
+      
+      <div class="flex justify-between items-center mb-6">
+        <h3 id="modal-title" class="text-xl font-bold text-slate-900 dark:text-white">Add Transaction</h3>
+        <button id="btn-close-modal" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors focus:outline-none">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="transaction-form" class="flex flex-col gap-4">
+        <input type="hidden" id="tx-type" name="type" value="Expense">
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Amount</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium" id="modal-currency">₦</span>
+            <input type="number" id="tx-amount" required min="1" step="any" placeholder="0.00" class="w-full pl-8 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-slate-900 dark:text-white font-semibold">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
+          <input type="text" id="tx-desc" required placeholder="e.g., Groceries" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-slate-900 dark:text-white">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Category</label>
+            <div class="relative">
+              <select id="tx-category" required class="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-slate-900 dark:text-white appearance-none">
+                <option value="General">General</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Account</label>
+            <div class="relative">
+              <select id="tx-account" required class="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-slate-900 dark:text-white appearance-none">
+                <option value="Main">Main</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+            </div>
+          </div>
+        </div>
+
+        <div id="transfer-target-container" class="hidden">
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">To Account</label>
+          <div class="relative">
+            <select id="tx-to-account" class="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-slate-900 dark:text-white appearance-none">
+              </select>
+            <i data-lucide="chevron-down" class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit-tx" class="w-full mt-4 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg shadow-primary/30 transition-all flex justify-center items-center gap-2">
+          <span id="submit-spinner" class="hidden"><i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i></span>
+          <span id="submit-text">Save Transaction</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center gap-2 pointer-events-none"></div>
+
+  <?!= HtmlService.createHtmlOutputFromFile('components.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('charts.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('animations.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('dashboard.js').getContent(); ?>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
