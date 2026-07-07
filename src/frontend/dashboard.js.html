@@ -34,11 +34,26 @@ const App = {
 
     const refreshBtn = document.getElementById('refresh-btn');
     if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => {
+      refreshBtn.addEventListener('click', async () => {
         if (this.state.isFetching) return;
-        const icon = refreshBtn.querySelector('i');
-        icon.classList.add('animate-spin');
-        this.fetchData(true).finally(() => icon.classList.remove('animate-spin'));
+        
+        // Find whatever icon tag is there right now (i or svg)
+        const icon = refreshBtn.querySelector('svg, i');
+        if (icon) icon.classList.add('animate-spin');
+        
+        // Reset initialization so animations replay on refresh
+        this.state.hasInitialized = false;
+        
+        try {
+          await this.fetchData(true);
+          if (typeof Components !== 'undefined') {
+            Components.showToast('Dashboard synced with latest data', 'success');
+          }
+        } finally {
+          // Re-query the DOM because Lucide might have replaced the SVG during render
+          const currentIcon = refreshBtn.querySelector('svg, i');
+          if (currentIcon) currentIcon.classList.remove('animate-spin');
+        }
       });
     }
   },
@@ -81,9 +96,20 @@ const App = {
         return;
       }
 
+      // FAILSAFE: Force the connection to close if Google hangs for 15 seconds
+      const timeout = setTimeout(() => {
+        reject(new Error('Request timed out. Google Sheets took too long to respond.'));
+      }, 15000);
+
       google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
+        .withSuccessHandler((res) => {
+          clearTimeout(timeout);
+          resolve(res);
+        })
+        .withFailureHandler((err) => {
+          clearTimeout(timeout);
+          reject(err);
+        })
         [functionName](...args);
     });
   },
@@ -100,7 +126,6 @@ const App = {
       subtitle.textContent = `Cycle: ${this.state.payload.cycle}`;
     }
 
-    // Set Modal Currency Symbol
     const currency = (this.state.payload.settings && this.state.payload.settings['Currency']) ? this.state.payload.settings['Currency'] : '₦';
     const modalCurrency = document.getElementById('modal-currency');
     if (modalCurrency) modalCurrency.textContent = currency;
@@ -185,7 +210,6 @@ const App = {
       if (isOpen && !fabMenu.contains(e.target) && !fabMain.contains(e.target)) toggleMenu();
     });
 
-    // Attach Modal triggers to FAB buttons
     document.getElementById('btn-add-expense')?.addEventListener('click', () => { toggleMenu(); this.openModal('Expense'); });
     document.getElementById('btn-add-income')?.addEventListener('click', () => { toggleMenu(); this.openModal('Income'); });
     document.getElementById('btn-transfer')?.addEventListener('click', () => { toggleMenu(); this.openModal('Transfer'); });
@@ -219,14 +243,11 @@ const App = {
     const targetContainer = document.getElementById('transfer-target-container');
     const toAccountInput = document.getElementById('tx-to-account');
 
-    // Reset Form
     document.getElementById('transaction-form').reset();
 
-    // Set UI State
     title.textContent = `Add ${type}`;
     typeInput.value = type;
 
-    // Handle Transfer specific fields
     if (type === 'Transfer') {
       targetContainer.classList.remove('hidden');
       toAccountInput.required = true;
@@ -238,7 +259,6 @@ const App = {
 
     this.populateModalDropdowns(type);
 
-    // Animate In
     modal.classList.remove('opacity-0', 'pointer-events-none');
     setTimeout(() => {
       panel.classList.remove('scale-95');
@@ -246,8 +266,6 @@ const App = {
     }, 10);
     
     this.state.modalOpen = true;
-    
-    // Auto-focus amount
     setTimeout(() => document.getElementById('tx-amount').focus(), 100);
   },
 
@@ -255,7 +273,6 @@ const App = {
     const modal = document.getElementById('transaction-modal');
     const panel = document.getElementById('modal-panel');
 
-    // Animate Out
     panel.classList.remove('scale-100');
     panel.classList.add('scale-95');
     
@@ -270,7 +287,6 @@ const App = {
     const accountSelect = document.getElementById('tx-account');
     const toAccountSelect = document.getElementById('tx-to-account');
 
-    // 1. Populate Categories based on Type
     let categories = [];
     if (type === 'Expense') {
       categories = this.state.payload.expenses.map(e => e.category);
@@ -283,66 +299,142 @@ const App = {
 
     categorySelect.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
 
-    // 2. Populate Accounts
-    const accounts = this.state.payload.accounts.map(a => a.name);
+    const accounts = this.state.payload.accounts
+      .map(a => a.name)
+      .sort((a, b) => a.localeCompare(b));
     const accountOptions = accounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
     
     accountSelect.innerHTML = accountOptions;
+
     if (toAccountSelect) {
-      toAccountSelect.innerHTML = `<option value="" disabled selected>Select destination...</option>` + accountOptions;
+      toAccountSelect.innerHTML =
+        `<option value="" disabled selected>Select destination...</option>` +
+        accountOptions;
+
+      accountSelect.onchange = () => {
+        const source = accountSelect.value;
+
+        toAccountSelect.innerHTML =
+          `<option value="" disabled selected>Select destination...</option>` +
+          accounts
+            .filter(acc => acc !== source)
+            .map(acc => `<option value="${acc}">${acc}</option>`)
+            .join('');
+      };
+
+      accountSelect.dispatchEvent(new Event('change'));
     }
   },
 
-  async submitTransaction() {
-    const submitBtn = document.getElementById('btn-submit-tx');
-    const spinner = document.getElementById('submit-spinner');
-    const text = document.getElementById('submit-text');
+async submitTransaction() {
 
-    // Gather Data
-    const formData = {
-      type: document.getElementById('tx-type').value,
-      amount: document.getElementById('tx-amount').value,
-      description: document.getElementById('tx-desc').value,
-      category: document.getElementById('tx-category').value,
-      account: document.getElementById('tx-account').value,
-      toAccount: document.getElementById('tx-to-account').value || '',
-      date: new Date().toISOString()
-    };
+  const submitBtn = document.getElementById('btn-submit-tx');
+  const spinner = document.getElementById('submit-spinner');
+  const text = document.getElementById('submit-text');
 
-    if (formData.type === 'Transfer' && formData.account === formData.toAccount) {
-      Components.showToast('Source and Destination accounts must be different', 'error');
-      return;
+  const type = document.getElementById('tx-type').value;
+  const selectedAccount = document.getElementById('tx-account').value;
+  const transferDestination =
+    document.getElementById('tx-to-account').value || '';
+
+  // Frontend only collects raw user input.
+  // Backend (resolveAccountColumns) decides From/To Account.
+  const formData = {
+
+    type: type,
+
+    amount: document.getElementById('tx-amount').value,
+
+    description: document.getElementById('tx-desc').value,
+
+    category: document.getElementById('tx-category').value,
+
+    account: selectedAccount,
+
+    toAccount: transferDestination,
+
+    notes: 'Dashboard Entry'
+
+  };
+
+  // Prevent invalid transfers
+  if (
+    type === 'Transfer' &&
+    selectedAccount === transferDestination
+  ) {
+    if (typeof Components !== 'undefined') {
+      Components.showToast(
+        'Source and Destination accounts must be different',
+        'error'
+      );
     }
-
-    // UI Loading State
-    submitBtn.disabled = true;
-    spinner.classList.remove('hidden');
-    text.textContent = 'Saving...';
-
-    try {
-      // Send to Backend
-      const response = await this.serverCall('submitNewTransaction', formData);
-      
-      if (response.error) throw new Error(response.message);
-
-      // Success
-      this.closeModal();
-      Components.showToast('Transaction saved successfully', 'success');
-      
-      // Refresh Data in the background
-      const refreshIcon = document.getElementById('refresh-btn')?.querySelector('i');
-      if (refreshIcon) refreshIcon.classList.add('animate-spin');
-      this.fetchData(true).finally(() => refreshIcon?.classList.remove('animate-spin'));
-
-    } catch (error) {
-      Components.showToast(error.message || 'Failed to save transaction', 'error');
-    } finally {
-      // Reset UI
-      submitBtn.disabled = false;
-      spinner.classList.add('hidden');
-      text.textContent = 'Save Transaction';
-    }
+    return;
   }
+
+  submitBtn.disabled = true;
+  spinner.classList.remove('hidden');
+  text.textContent = 'Saving...';
+
+  try {
+
+    const response = await this.serverCall(
+      'submitNewTransaction',
+      formData
+    );
+
+    if (response.error) {
+      throw new Error(response.message);
+    }
+
+    this.closeModal();
+
+    if (typeof Components !== 'undefined') {
+      Components.showToast(
+        'Transaction saved successfully',
+        'success'
+      );
+    }
+
+    // Refresh dashboard automatically
+    const refreshBtn = document.getElementById('refresh-btn');
+    const refreshIcon =
+      refreshBtn?.querySelector('svg, i');
+
+    if (refreshIcon) {
+      refreshIcon.classList.add('animate-spin');
+    }
+
+    this.state.hasInitialized = false;
+
+    await this.fetchData(true);
+
+    const currentIcon =
+      refreshBtn?.querySelector('svg, i');
+
+    if (currentIcon) {
+      currentIcon.classList.remove('animate-spin');
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+    if (typeof Components !== 'undefined') {
+      Components.showToast(
+        error.message || 'Failed to save transaction',
+        'error'
+      );
+    }
+
+  } finally {
+
+    submitBtn.disabled = false;
+    spinner.classList.add('hidden');
+    text.textContent = 'Save Transaction';
+
+  }
+
+}
 
 };
 

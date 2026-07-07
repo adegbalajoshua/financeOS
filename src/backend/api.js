@@ -79,42 +79,130 @@ function forceRefreshDashboard(cycle) {
 }
 
 /**
+ * Converts raw transaction input into ledger columns.
+ * Returns { fromAccount, toAccount }.
+ */
+function resolveAccountColumns(formData) {
+
+  const type = String(formData.type || '');
+
+  const selectedAccount = String(formData.account || '');
+  const destinationAccount = String(formData.toAccount || '');
+
+  switch (type) {
+
+    case 'Income':
+      return {
+        fromAccount: '',
+        toAccount: selectedAccount
+      };
+
+    case 'Expense':
+      return {
+        fromAccount: selectedAccount,
+        toAccount: ''
+      };
+
+    case 'Transfer':
+      if (!destinationAccount) {
+        throw new Error('Destination account is required.');
+      }
+
+      if (selectedAccount === destinationAccount) {
+        throw new Error('Source and destination accounts must be different.');
+      }
+
+      return {
+        fromAccount: selectedAccount,
+        toAccount: destinationAccount
+      };
+
+    case 'Saving':
+      return {
+        fromAccount: selectedAccount,
+        toAccount: destinationAccount || ''
+      };
+
+    case 'Bank Charge':
+      return {
+        fromAccount: selectedAccount,
+        toAccount: ''
+      };
+
+    case 'Receivable':
+      return {
+        fromAccount: '',
+        toAccount: selectedAccount
+      };
+
+    default:
+      return {
+        fromAccount: selectedAccount,
+        toAccount: destinationAccount
+      };
+  }
+}
+
+/**
  * Receives a new transaction from the frontend dashboard, formats it, 
  * appends it to the Daily Log, and clears the cache.
  */
 function submitNewTransaction(formData) {
+
   try {
+
     const settings = Database.getSettings();
     const cycle = settings['Active_Cycle'];
 
-    if (!cycle) throw new Error("No active budget cycle found.");
+    if (!cycle) {
+      throw new Error('No active budget cycle found.');
+    }
 
-    // Format Date exactly as the spreadsheet expects (e.g., "06-Jul-26")
-    const formattedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd-MMM-yy");
+    const amount = Number(formData.amount);
 
-    // Construct the row array matching the Daily Log columns
-    // [Date, Budget Cycle, Type, Category, Description, Status (Empty), From Account, Amount, Note]
-    const transactionRow = [
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('Invalid transaction amount.');
+    }
+
+    const {
+      fromAccount,
+      toAccount
+    } = resolveAccountColumns(formData);
+
+    const formattedDate =
+      Utilities.formatDate(
+        new Date(),
+        Session.getScriptTimeZone(),
+        'dd-MMM-yy'
+      );
+
+    const newRow = [
       formattedDate,
       cycle,
       formData.type,
       formData.category,
-      formData.description,
-      formData.toAccount, // Put target account in the "To Account" column if transfer
-      formData.account,   // Source Account
-      Number(formData.amount),
-      "Dashboard Entry"
+      (formData.description || '').trim(),
+      fromAccount,
+      toAccount,
+      amount,
+      formData.notes || ''
     ];
 
-    // Append to sheet
-    Database.appendTransaction(transactionRow);
+    Database.appendTransaction(newRow);
 
-    // Clear the cache so the dashboard sees the new data on refresh
     API.clearCache();
 
-    return { success: true };
+    return {
+      success: true
+    };
 
   } catch (error) {
-    return { error: true, message: error.message };
+
+    return {
+      error: true,
+      message: error.message
+    };
+
   }
+
 }

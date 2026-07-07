@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security Vulnerability
-    url: https://github.com/OWNER/financeos/security/advisories/new
+    url: https://github.com/adegbalajoshua/financeos/security/advisories/new
     about: Do not open a public issue for security reports. See SECURITY.md.
   - name: Question / Discussion
-    url: https://github.com/OWNER/financeos/discussions
+    url: https://github.com/adegbalajoshua/financeos/discussions
     about: General questions, setup help, and ideas belong in Discussions, not Issues.
