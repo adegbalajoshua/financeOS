@@ -21,6 +21,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Implemented automated cache clearing via ('API.clearCache()').  
 - The cache is now dynamically wiped whenever a new transaction is appended to the ledger.  
 - The cache is also explicitly wiped at the end of the ('startNewCycle') automation workflow to ensure the dashboard reflects the newly funded cycle immediately.
+### Fixed
+- Dashboard "Recent Activity" timeline was rendering `receivableList` instead of actual transactions, and colored entries by array index rather than transaction type. `FinanceEngine.generateDashboardPayload` now returns a `recentTransactions` array (most recent 8, newest first), and `Components.renderTimeline` colors/signs each entry by its real `Type` (Income/Receivable credit, Transfer neutral, everything else debit).
 
 ## [Unreleased]
 

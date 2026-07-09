@@ -9,14 +9,14 @@
 
 const Components = {
 
-  renderAll(payload) {
+renderAll(payload) {
     if (!payload || payload.error) return;
 
     const currency = (payload.settings && payload.settings['Currency']) ? payload.settings['Currency'] : '₦';
 
     this.renderKPIs(payload.kpis, currency);
     this.renderBudget(payload.expenses, currency);
-    this.renderTimeline(payload.receivableList, currency); 
+    this.renderTimeline(payload.recentTransactions, currency);
     this.renderAccounts(payload.accounts, currency);
     this.renderSavings(payload.savings, currency);
     this.renderReceivables(payload.receivableList, currency);
@@ -179,7 +179,7 @@ const Components = {
     `).join('');
   },
 
-  renderTimeline(items, currency) {
+renderTimeline(items, currency) {
     const container = document.getElementById('timeline-container');
     if (!container) return;
 
@@ -188,10 +188,20 @@ const Components = {
       return;
     }
 
-    container.innerHTML = items.slice(0, 5).map((item, index) => {
-      const isIncome = index % 2 === 0; 
-      const color = isIncome ? 'success' : 'danger';
-      const prefix = isIncome ? '+' : '-';
+    const styleForType = (type) => {
+      switch (type) {
+        case 'Income':
+        case 'Receivable':
+          return { color: 'success', prefix: '+' };
+        case 'Transfer':
+          return { color: 'primary', prefix: '' };
+        default: // Expense, Bank Charge, Saving
+          return { color: 'danger', prefix: '-' };
+      }
+    };
+
+    container.innerHTML = items.slice(0, 5).map(item => {
+      const { color, prefix } = styleForType(item.type);
 
       return `
       <div class="relative pl-6 stagger-item opacity-0">
@@ -199,7 +209,7 @@ const Components = {
         <div class="flex justify-between items-start">
           <div>
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">${item.desc}</p>
-            <p class="text-xs text-slate-500 mt-0.5">Recent</p>
+            <p class="text-xs text-slate-500 mt-0.5">${item.date || 'Recent'}</p>
           </div>
           <span class="text-sm font-bold text-${color}">${prefix}${this.formatCurrency(item.amount, currency)}</span>
         </div>
