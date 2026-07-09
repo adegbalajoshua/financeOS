@@ -50,6 +50,20 @@ Appends a new row to `Daily Log` and clears the cache.
 
 **Side effects:** Appends to `Daily Log` using the active cycle from `Settings`, stamps the date as `dd-MMM-yy` in the script's timezone, sets the note to `"Dashboard Entry"`, then calls `API.clearCache()`.
 
+### `updateTransaction(transactionId, formData)`
+
+Overwrites an existing `Daily Log` row by `Transaction ID`. `type`, `date`, and `budgetCycle` are preserved from the original row; `category`, `account`, `toAccount`, `amount`, and `description` can change. Sets the note to `"Dashboard Entry (Edited)"`.
+
+**Returns:** `{ success: true }` or `{ error: true, message: string }`.
+
+---
+
+### `deleteTransaction(transactionId)`
+
+Deletes a `Daily Log` row by `Transaction ID` and clears the cache.
+
+**Returns:** `{ success: true }` or `{ error: true, message: string }`.
+
 ## `API` Module (Internal)
 
 Not directly callable from the frontend, `api.js` exposes these methods internally, wrapped by the global endpoints above.

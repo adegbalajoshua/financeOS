@@ -14,7 +14,8 @@ const App = {
     isFetching: false,
     theme: 'light',
     hasInitialized: false,
-    modalOpen: false
+    modalOpen: false,
+    editingTransactionId: null
   },
 
   async init() {
@@ -37,11 +38,9 @@ const App = {
       refreshBtn.addEventListener('click', async () => {
         if (this.state.isFetching) return;
         
-        // Find whatever icon tag is there right now (i or svg)
         const icon = refreshBtn.querySelector('svg, i');
         if (icon) icon.classList.add('animate-spin');
         
-        // Reset initialization so animations replay on refresh
         this.state.hasInitialized = false;
         
         try {
@@ -50,9 +49,27 @@ const App = {
             Components.showToast('Dashboard synced with latest data', 'success');
           }
         } finally {
-          // Re-query the DOM because Lucide might have replaced the SVG during render
           const currentIcon = refreshBtn.querySelector('svg, i');
           if (currentIcon) currentIcon.classList.remove('animate-spin');
+        }
+      });
+    }
+
+    const timelineContainer = document.getElementById('timeline-container');
+    if (timelineContainer) {
+      timelineContainer.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('.tx-edit-btn');
+        const deleteBtn = e.target.closest('.tx-delete-btn');
+
+        if (editBtn) {
+          const tx = (this.state.payload.recentTransactions || [])
+            .find(t => t.id === editBtn.dataset.id);
+          if (tx) this.openModal(tx.type, tx);
+          return;
+        }
+
+        if (deleteBtn) {
+          this.handleDeleteTransaction(deleteBtn.dataset.id);
         }
       });
     }
@@ -96,7 +113,6 @@ const App = {
         return;
       }
 
-      // FAILSAFE: Force the connection to close if Google hangs for 15 seconds
       const timeout = setTimeout(() => {
         reject(new Error('Request timed out. Google Sheets took too long to respond.'));
       }, 15000);
@@ -233,7 +249,11 @@ const App = {
     });
   },
 
-  openModal(type) {
+  /**
+   * @param {string} type Transaction type.
+   * @param {Object|null} existingTx Pass a recentTransactions item to open in edit mode.
+   */
+  openModal(type, existingTx = null) {
     if (!this.state.payload) return;
 
     const modal = document.getElementById('transaction-modal');
@@ -242,10 +262,14 @@ const App = {
     const typeInput = document.getElementById('tx-type');
     const targetContainer = document.getElementById('transfer-target-container');
     const toAccountInput = document.getElementById('tx-to-account');
+    const submitText = document.getElementById('submit-text');
 
     document.getElementById('transaction-form').reset();
 
-    title.textContent = `Add ${type}`;
+    this.state.editingTransactionId = existingTx ? existingTx.id : null;
+
+    title.textContent = existingTx ? `Edit ${type}` : `Add ${type}`;
+    submitText.textContent = existingTx ? 'Update Transaction' : 'Save Transaction';
     typeInput.value = type;
 
     if (type === 'Transfer') {
@@ -257,7 +281,17 @@ const App = {
       toAccountInput.value = '';
     }
 
-    this.populateModalDropdowns(type);
+    this.populateModalDropdowns(type, existingTx);
+
+    if (existingTx) {
+      document.getElementById('tx-amount').value = existingTx.amount;
+      document.getElementById('tx-desc').value = existingTx.desc;
+      document.getElementById('tx-category').value = existingTx.category;
+
+      const accountSelect = document.getElementById('tx-account');
+      accountSelect.value = existingTx.fromAccount || existingTx.toAccount;
+      accountSelect.dispatchEvent(new Event('change')); // rebuilds + preselects To Account for transfers
+    }
 
     modal.classList.remove('opacity-0', 'pointer-events-none');
     setTimeout(() => {
@@ -279,10 +313,15 @@ const App = {
     setTimeout(() => {
       modal.classList.add('opacity-0', 'pointer-events-none');
       this.state.modalOpen = false;
+      this.state.editingTransactionId = null;
     }, 200);
   },
 
-  populateModalDropdowns(type) {
+  /**
+   * @param {string} type
+   * @param {Object|null} existingTx Optional, ensures the current category survives even if it's not in the standard list for this type.
+   */
+  populateModalDropdowns(type, existingTx = null) {
     const categorySelect = document.getElementById('tx-category');
     const accountSelect = document.getElementById('tx-account');
     const toAccountSelect = document.getElementById('tx-to-account');
@@ -295,6 +334,17 @@ const App = {
       categories = ['Salary', 'Business', 'Investment', 'Other'];
     } else if (type === 'Transfer') {
       categories = ['Internal Transfer'];
+    } else if (type === 'Saving') {
+      categories = this.state.payload.savings.map(s => s.category);
+      if (categories.length === 0) categories = ['Emergency Fund'];
+    } else if (type === 'Bank Charge') {
+      categories = ['Bank Charge'];
+    } else if (type === 'Receivable') {
+      categories = ['Receivable'];
+    }
+
+    if (existingTx && existingTx.category && !categories.includes(existingTx.category)) {
+      categories = [existingTx.category, ...categories];
     }
 
     categorySelect.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
@@ -320,121 +370,123 @@ const App = {
             .filter(acc => acc !== source)
             .map(acc => `<option value="${acc}">${acc}</option>`)
             .join('');
+
+        if (existingTx && existingTx.type === 'Transfer' && existingTx.toAccount) {
+          toAccountSelect.value = existingTx.toAccount;
+        }
       };
 
       accountSelect.dispatchEvent(new Event('change'));
     }
   },
 
-async submitTransaction() {
+  async submitTransaction() {
 
-  const submitBtn = document.getElementById('btn-submit-tx');
-  const spinner = document.getElementById('submit-spinner');
-  const text = document.getElementById('submit-text');
+    const submitBtn = document.getElementById('btn-submit-tx');
+    const spinner = document.getElementById('submit-spinner');
+    const text = document.getElementById('submit-text');
 
-  const type = document.getElementById('tx-type').value;
-  const selectedAccount = document.getElementById('tx-account').value;
-  const transferDestination =
-    document.getElementById('tx-to-account').value || '';
+    const type = document.getElementById('tx-type').value;
+    const selectedAccount = document.getElementById('tx-account').value;
+    const transferDestination = document.getElementById('tx-to-account').value || '';
 
-  // Frontend only collects raw user input.
-  // Backend (resolveAccountColumns) decides From/To Account.
-  const formData = {
+    const formData = {
+      type: type,
+      amount: document.getElementById('tx-amount').value,
+      description: document.getElementById('tx-desc').value,
+      category: document.getElementById('tx-category').value,
+      account: selectedAccount,
+      toAccount: transferDestination,
+      notes: 'Dashboard Entry'
+    };
 
-    type: type,
-
-    amount: document.getElementById('tx-amount').value,
-
-    description: document.getElementById('tx-desc').value,
-
-    category: document.getElementById('tx-category').value,
-
-    account: selectedAccount,
-
-    toAccount: transferDestination,
-
-    notes: 'Dashboard Entry'
-
-  };
-
-  // Prevent invalid transfers
-  if (
-    type === 'Transfer' &&
-    selectedAccount === transferDestination
-  ) {
-    if (typeof Components !== 'undefined') {
-      Components.showToast(
-        'Source and Destination accounts must be different',
-        'error'
-      );
+    if (type === 'Transfer' && selectedAccount === transferDestination) {
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Source and Destination accounts must be different', 'error');
+      }
+      return;
     }
-    return;
+
+    const editingId = this.state.editingTransactionId;
+
+    submitBtn.disabled = true;
+    spinner.classList.remove('hidden');
+    text.textContent = editingId ? 'Updating...' : 'Saving...';
+
+    try {
+
+      const response = editingId
+        ? await this.serverCall('updateTransaction', editingId, formData)
+        : await this.serverCall('submitNewTransaction', formData);
+
+      if (response.error) {
+        throw new Error(response.message);
+      }
+
+      this.closeModal();
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast(
+          editingId ? 'Transaction updated successfully' : 'Transaction saved successfully',
+          'success'
+        );
+      }
+
+      const refreshBtn = document.getElementById('refresh-btn');
+      const refreshIcon = refreshBtn?.querySelector('svg, i');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+      this.state.hasInitialized = false;
+      await this.fetchData(true);
+
+      const currentIcon = refreshBtn?.querySelector('svg, i');
+      if (currentIcon) currentIcon.classList.remove('animate-spin');
+
+    } catch (error) {
+
+      console.error(error);
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast(
+          error.message || 'Failed to save transaction',
+          'error'
+        );
+      }
+
+    } finally {
+
+      submitBtn.disabled = false;
+      spinner.classList.add('hidden');
+      text.textContent = 'Save Transaction';
+
+    }
+
+  },
+
+  async handleDeleteTransaction(id) {
+    if (!id) return;
+
+    const confirmed = window.confirm('Delete this transaction? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      const response = await this.serverCall('deleteTransaction', id);
+      if (response.error) throw new Error(response.message);
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Transaction deleted', 'success');
+      }
+
+      this.state.hasInitialized = false;
+      await this.fetchData(true);
+
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to delete transaction', 'error');
+      }
+    }
   }
-
-  submitBtn.disabled = true;
-  spinner.classList.remove('hidden');
-  text.textContent = 'Saving...';
-
-  try {
-
-    const response = await this.serverCall(
-      'submitNewTransaction',
-      formData
-    );
-
-    if (response.error) {
-      throw new Error(response.message);
-    }
-
-    this.closeModal();
-
-    if (typeof Components !== 'undefined') {
-      Components.showToast(
-        'Transaction saved successfully',
-        'success'
-      );
-    }
-
-    // Refresh dashboard automatically
-    const refreshBtn = document.getElementById('refresh-btn');
-    const refreshIcon =
-      refreshBtn?.querySelector('svg, i');
-
-    if (refreshIcon) {
-      refreshIcon.classList.add('animate-spin');
-    }
-
-    this.state.hasInitialized = false;
-
-    await this.fetchData(true);
-
-    const currentIcon =
-      refreshBtn?.querySelector('svg, i');
-
-    if (currentIcon) {
-      currentIcon.classList.remove('animate-spin');
-    }
-
-  } catch (error) {
-
-    console.error(error);
-
-    if (typeof Components !== 'undefined') {
-      Components.showToast(
-        error.message || 'Failed to save transaction',
-        'error'
-      );
-    }
-
-  } finally {
-
-    submitBtn.disabled = false;
-    spinner.classList.add('hidden');
-    text.textContent = 'Save Transaction';
-
-  }
-
-}
 
 };
 

@@ -202,19 +202,33 @@ renderTimeline(items, currency) {
 
     container.innerHTML = items.slice(0, 5).map(item => {
       const { color, prefix } = styleForType(item.type);
+      const canEdit = Boolean(item.id);
 
       return `
-      <div class="relative pl-6 stagger-item opacity-0">
+      <div class="relative pl-6 stagger-item opacity-0 group" data-tx-id="${item.id || ''}">
         <div class="absolute -left-[5px] top-1 w-[9px] h-[9px] rounded-full bg-${color} border-2 border-white dark:border-dark shadow-sm"></div>
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">${item.desc}</p>
+        <div class="flex justify-between items-start gap-2">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">${item.desc}</p>
             <p class="text-xs text-slate-500 mt-0.5">${item.date || 'Recent'}</p>
           </div>
-          <span class="text-sm font-bold text-${color}">${prefix}${this.formatCurrency(item.amount, currency)}</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-sm font-bold text-${color}">${prefix}${this.formatCurrency(item.amount, currency)}</span>
+            ${canEdit ? `
+            <div class="hidden group-hover:flex items-center gap-1">
+              <button class="tx-edit-btn p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary" data-id="${item.id}" aria-label="Edit transaction">
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+              </button>
+              <button class="tx-delete-btn p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-danger" data-id="${item.id}" aria-label="Delete transaction">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>` : ''}
+          </div>
         </div>
       </div>
     `}).join('');
+
+    if (window.lucide) window.lucide.createIcons({root: container});
   },
 
   showToast(message, type = 'info') {

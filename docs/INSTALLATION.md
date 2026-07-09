@@ -51,16 +51,19 @@ FinanceOS expects five sheet tabs, named exactly as follows (these names are ref
 
 ### `Daily Log`
 
-| Date | Budget Cycle | Type | Category | Description | To Account | From Account | Amount | Note |
+| Date | Budget Cycle | Type | Category | Description | To Account | From Account | Amount | Note | Transaction ID |
 |---|---|---|---|---|---|---|---|---|
 | 01-Jul-26 | Jul-26 | Income | Salary | Monthly Paycheck | | Zenith | 350000 | Auto-funded Jul-26 |
-| 03-Jul-26 | Jul-26 | Expense | Groceries | Weekly shop | | Zenith | 18000 | Dashboard Entry |
+| 03-Jul-26 | Jul-26 | Expense | Groceries | Weekly shop | | Zenith | 18000 | Dashboard Entry | 0001 |
 
 Valid `Type` values: `Income`, `Expense`, `Saving`, `Bank Charge`, `Receivable`, `Transfer`.
 
 > **Column order matters.** `Database.getSheetDataAsObjects` maps values by header text, not position, but the header row must exactly match the names above (case-sensitive, including the space in `To Account` / `From Account` / `Budget Cycle`). Do not rename or reorder these headers without also updating `financeEngine.js`.
 
 > **Known issue:** the `doPost` webhook (`gateway.js`) currently writes the source account into the `To Account` column position and the destination into `From Account`, the reverse of what `api.js` and `automation.js` write. If you're setting up the Telegram integration, verify against [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) before trusting webhook-logged balances.
+
+> **Existing installs:** if you're upgrading from a version without this column, add `Transaction ID` as the last header in `Daily Log`, then run **financeOS → Backfill Transaction IDs** once. Until you do, older transactions can be deleted but not edited from the dashboard (Edit/Delete buttons only appear on rows that have an ID).
+
 
 ### `Analytics`
 

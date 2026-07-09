@@ -23,6 +23,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Implemented automated cache clearing via ('API.clearCache()').  
 - The cache is now dynamically wiped whenever a new transaction is appended to the ledger.  
 - The cache is also explicitly wiped at the end of the ('startNewCycle') automation workflow to ensure the dashboard reflects the newly funded cycle immediately.
+### Added
+- Edit and delete for individual transactions from the dashboard's Recent Activity panel. Backed by a new `Transaction ID` column in `Daily Log` (additive, MINOR version) and two new endpoints, `updateTransaction` and `deleteTransaction`. A **financeOS → Backfill Transaction IDs** menu action populates IDs for transactions logged before this change.
 
 ## [Unreleased]
 

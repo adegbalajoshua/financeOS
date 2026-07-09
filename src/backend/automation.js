@@ -148,4 +148,47 @@ function startNewCycle() {
     ].join('\n')
   );
 
+
+
+
+}
+  /**
+ * One-time migration helper. Populates Transaction ID for any Daily Log
+ * row that predates the column (required for Edit/Delete from the
+ * dashboard to work on older transactions). Safe to re-run, only fills
+ * blanks.
+ */
+
+function backfillTransactionIds() {
+
+  const ui = SpreadsheetApp.getUi();
+  const sheet = Database.getSheet(CONFIG.SHEETS.LOG);
+  const values = sheet.getDataRange().getDisplayValues();
+
+  if (values.length <= 1) {
+    ui.alert('No transactions found.');
+    return;
+  }
+
+  const headers = values[0];
+  const idCol = headers.indexOf(CONFIG.LOG_SCHEMA.ID_HEADER);
+
+  if (idCol === -1) {
+    ui.alert(
+      `Add a "${CONFIG.LOG_SCHEMA.ID_HEADER}" column as the last column in Daily Log first, then re-run this.`
+    );
+    return;
+  }
+
+  let filled = 0;
+
+  for (let i = 1; i < values.length; i++) {
+    if (!values[i][idCol]) {
+      sheet.getRange(i + 1, idCol + 1).setValue(Utilities.getUuid());
+      filled++;
+    }
+  }
+
+  ui.alert(`Backfilled ${filled} transaction(s) with a new Transaction ID.`);
+
 }

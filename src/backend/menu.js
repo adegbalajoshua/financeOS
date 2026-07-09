@@ -37,13 +37,15 @@ const Menu = {
    * simple trigger and exposes the primary application features through
    * the Google Sheets menu bar.
    */
-  build() {
+build() {
     SpreadsheetApp.getUi()
       .createMenu('financeOS')
       .addItem('Launch Dashboard', 'openDashboard')
       .addSeparator()
       .addItem('Start New Budget Cycle', 'startNewCycle')
       .addItem('Generate Analytics', 'buildAnalyticsDashboard')
+      .addSeparator()
+      .addItem('Backfill Transaction IDs', 'backfillTransactionIds')
       .addToUi();
   },
 

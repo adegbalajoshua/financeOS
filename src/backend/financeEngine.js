@@ -142,16 +142,24 @@ const FinanceEngine = {
    * tail of the array is already chronological. No date parsing needed
    * against the display-string Date column.
    */
+/**
+   * Returns the most recent N transactions for a cycle, newest first.
+   * Rows are only ever appended (see Database.appendTransaction), so the
+   * tail of the array is already chronological.
+   */
   _getRecentTransactions: function(cycleTransactions, limit) {
     return cycleTransactions
       .slice(-limit)
       .reverse()
       .map(tx => ({
+        id: tx['Transaction ID'] || null,
         date: tx['Date'],
         desc: tx['Description'],
         amount: this._parseNum(tx['Amount']),
         type: tx['Type'],
-        category: tx['Category']
+        category: tx['Category'],
+        fromAccount: tx['From Account'] || '',
+        toAccount: tx['To Account'] || ''
       }));
   }
 };

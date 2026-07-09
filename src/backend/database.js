@@ -168,6 +168,61 @@ const Database = {
   },
 
   /**
+   * Finds the 1-indexed sheet row for a transaction by its Transaction ID.
+   * Returns -1 if not found (deleted, or predates the ID column).
+   *
+   * @param {string} transactionId
+   * @returns {number}
+   */
+  findTransactionRow(transactionId) {
+
+    const sheet = this.getSheet(CONFIG.SHEETS.LOG);
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values[0];
+    const idCol = headers.indexOf(CONFIG.LOG_SCHEMA.ID_HEADER);
+
+    if (idCol === -1) {
+      throw new Error(
+        `Daily Log is missing the "${CONFIG.LOG_SCHEMA.ID_HEADER}" column. See docs/TROUBLESHOOTING.md.`
+      );
+    }
+
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][idCol] === transactionId) {
+        return i + 1;
+      }
+    }
+
+    return -1;
+
+  },
+
+  /**
+   * Overwrites an existing Daily Log row in place.
+   *
+   * @param {number} rowIndex 1-indexed sheet row.
+   * @param {Array} transaction
+   */
+  updateTransactionRow(rowIndex, transaction) {
+
+    this.getSheet(CONFIG.SHEETS.LOG)
+      .getRange(rowIndex, 1, 1, transaction.length)
+      .setValues([transaction]);
+
+  },
+
+  /**
+   * Deletes a single row from Daily Log.
+   *
+   * @param {number} rowIndex 1-indexed sheet row.
+   */
+  deleteTransactionRow(rowIndex) {
+
+    this.getSheet(CONFIG.SHEETS.LOG).deleteRow(rowIndex);
+
+  },
+
+  /**
    * Appends multiple budget rows in a single batch operation.
    *
    * @param {Array<Array>} rows
