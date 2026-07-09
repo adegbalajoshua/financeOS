@@ -36,6 +36,7 @@ financeos/
 │   │
 │   └── frontend/
 │       ├── dashboard.html         # Root HTML template, includes all partials
+│       ├── about.html             # About dialog, launched from the Sheets menu
 │       ├── dashboard.css.html     # Tailwind config + custom utility classes
 │       ├── dashboard.js.html      # App state, data fetching, modal/form logic
 │       ├── components.js.html     # DOM rendering for KPIs, budgets, accounts, etc.

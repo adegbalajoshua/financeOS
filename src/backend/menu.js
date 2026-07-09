@@ -1,3 +1,4 @@
+/** FinanceOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
 /**
  * ============================================================================
  * Menu Module
@@ -46,6 +47,7 @@ build() {
       .addItem('Generate Analytics', 'buildAnalyticsDashboard')
       .addSeparator()
       .addItem('Backfill Transaction IDs', 'backfillTransactionIds')
+      .addItem('About financeOS', 'showAbout')
       .addToUi();
   },
 
@@ -64,7 +66,20 @@ build() {
       .setHeight(800);
 
     SpreadsheetApp.getUi().showModalDialog(html, 'FinanceOS');
+  },
+
+/**
+   * Displays project and author information with a clickable repository link.
+   */
+  showAbout() {
+    const html = HtmlService
+      .createHtmlOutputFromFile('about')
+      .setWidth(360)
+      .setHeight(280);
+
+    SpreadsheetApp.getUi().showModalDialog(html, 'About financeOS');
   }
+
 
 };
 
@@ -85,3 +100,11 @@ function onOpen() {
 function openDashboard() {
   Menu.launchDashboard();
 }
+
+/**
+ * Global endpoint invoked from the custom menu.
+ */
+function showAbout() {
+  Menu.showAbout();
+}
+

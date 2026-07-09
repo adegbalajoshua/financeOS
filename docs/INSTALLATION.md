@@ -91,6 +91,7 @@ Leave this tab empty, or don't create it at all. `analytics.js` creates it autom
 | Apps Script HTML file | Source file |
 |---|---|
 | `dashboard.html` | `dashboard.html` |
+| `about.html` | `about.html` |
 | `dashboard.css.html` | `dashboard.css.html` |
 | `components.js.html` | `components.js.html` |
 | `charts.js.html` | `charts.js.html` |

@@ -1,3 +1,4 @@
+/** FinanceOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
 /**
  * ============================================================================
  * Application Configuration

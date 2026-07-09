@@ -135,6 +135,14 @@ See [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) for the current gallery and a che
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Changelog](CHANGELOG.md)
 
+## Author
+
+Built and maintained by **adegbalajoshua**.
+
+- GitHub: [@adegbalajoshua](https://github.com/adegbalajoshua)
+
+If FinanceOS is useful to you, a star on the repo is appreciated.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
