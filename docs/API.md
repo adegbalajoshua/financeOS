@@ -86,6 +86,8 @@ Orchestrates the full payload assembly described in [Architecture: Data Flow](AR
   expenses: [{ category, budget, spent, remaining, percentUsed }],
   savings: [{ category, budget, spent, remaining, percentUsed }],
   receivableList: [{ desc: string, amount: number }]
+  recentTransactions: [{ date, desc, amount, type, category }],
+  settings: { Active_Cycle, Currency, Default_Category, Default_Account }
 }
 ```
 

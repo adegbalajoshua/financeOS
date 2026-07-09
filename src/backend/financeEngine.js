@@ -32,6 +32,7 @@ const FinanceEngine = {
     const summary = this._summarizeCycle(cycleTransactions);
     const expenses = this._mergeBudgets(cycleBudgets, summary.actualsMap, 'Expense');
     const savings = this._mergeBudgets(cycleBudgets, summary.actualsMap, 'Saving');
+    const recentTransactions = this._getRecentTransactions(cycleTransactions, 8);
 
     return {
       cycle: targetCycle,
@@ -45,7 +46,8 @@ const FinanceEngine = {
       accounts: balances.accountList,
       expenses: expenses,
       savings: savings,
-      receivableList: summary.receivableList
+      receivableList: summary.receivableList,
+      recentTransactions: recentTransactions
     };
   },
 
@@ -132,5 +134,24 @@ const FinanceEngine = {
         percentUsed: budgetAmount > 0 ? Math.round((spentAmount / budgetAmount) * 100) : 0
       };
     });
+  },
+
+  /**
+   * Returns the most recent N transactions for a cycle, newest first.
+   * Rows are only ever appended (see Database.appendTransaction), so the
+   * tail of the array is already chronological. No date parsing needed
+   * against the display-string Date column.
+   */
+  _getRecentTransactions: function(cycleTransactions, limit) {
+    return cycleTransactions
+      .slice(-limit)
+      .reverse()
+      .map(tx => ({
+        date: tx['Date'],
+        desc: tx['Description'],
+        amount: this._parseNum(tx['Amount']),
+        type: tx['Type'],
+        category: tx['Category']
+      }));
   }
 };
