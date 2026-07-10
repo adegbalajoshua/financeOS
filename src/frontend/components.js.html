@@ -179,6 +179,65 @@ renderAll(payload) {
     `).join('');
   },
 
+  renderManageAccounts(accounts) {
+    const container = document.getElementById('manage-accounts-list');
+    if (!container) return;
+
+    if (!accounts || accounts.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic">No accounts yet.</p>`;
+      return;
+    }
+
+    container.innerHTML = accounts.map(acc => `
+      <div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 ${acc.status === 'Inactive' ? 'opacity-50' : ''}">
+        <div>
+          <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">${acc.name}</p>
+          <p class="text-xs text-slate-500">${acc.type} · ${this.formatCurrency(acc.openingBalance)} opening · ${acc.status}</p>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="account-edit-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary" data-name="${acc.name}" aria-label="Edit account">
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+          </button>
+          ${acc.status === 'Active' ? `
+          <button class="account-deactivate-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-danger" data-name="${acc.name}" aria-label="Deactivate account">
+            <i data-lucide="power-off" class="w-4 h-4"></i>
+          </button>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    if (window.lucide) window.lucide.createIcons({root: container});
+  },
+
+  renderManageBudgets(budgets) {
+    const container = document.getElementById('manage-budgets-list');
+    if (!container) return;
+
+    if (!budgets || budgets.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-500 italic">No budget lines for this cycle yet.</p>`;
+      return;
+    }
+
+    container.innerHTML = budgets.map(b => `
+      <div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+        <div>
+          <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">${b.category}</p>
+          <p class="text-xs text-slate-500">${b.type} · ${this.formatCurrency(b.amount)}</p>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="budget-edit-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary" data-type="${b.type}" data-category="${b.category}" data-amount="${b.amount}" aria-label="Edit budget line">
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+          </button>
+          <button class="budget-delete-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-danger" data-type="${b.type}" data-category="${b.category}" aria-label="Delete budget line">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    if (window.lucide) window.lucide.createIcons({root: container});
+  },
+
 renderTimeline(items, currency) {
     const container = document.getElementById('timeline-container');
     if (!container) return;

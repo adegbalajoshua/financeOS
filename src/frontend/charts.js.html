@@ -1,6 +1,4 @@
 <script>
-/** FinanceOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
-
 /**
  * ============================================================================
  * Data Visualization (ApexCharts)
@@ -30,7 +28,8 @@ const Charts = {
 
   instances: {
     expenseDonut: null,
-    cashFlow: null
+    cashFlow: null,
+    trends: null
   },
 
   colors: {
@@ -309,6 +308,75 @@ const Charts = {
     container.innerHTML = '';
     this.instances.cashFlow = new ApexCharts(container, options);
     this.instances.cashFlow.render();
+  },
+
+  /**
+   * Renders the multi-cycle Income vs Spent bar chart in the Trends modal.
+   */
+  renderTrendsChart(cycles, theme) {
+    const containerId = '#chart-trends';
+    const container = document.querySelector(containerId);
+    const emptyState = document.getElementById('trends-empty-state');
+    if (!container) return;
+
+    if (!cycles || cycles.length === 0) {
+      container.classList.add('hidden');
+      if (emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+
+    container.classList.remove('hidden');
+    if (emptyState) emptyState.classList.add('hidden');
+
+    const isDark = theme === 'dark';
+
+    const options = {
+      series: [
+        { name: 'Income', data: cycles.map(c => c.income) },
+        { name: 'Spent', data: cycles.map(c => c.spent) }
+      ],
+      chart: {
+        type: 'bar',
+        height: '100%',
+        fontFamily: 'Inter, sans-serif',
+        background: 'transparent',
+        foreColor: isDark ? '#94A3B8' : '#64748B',
+        toolbar: { show: false }
+      },
+      colors: [this.colors.success, this.colors.danger],
+      plotOptions: {
+        bar: { borderRadius: 4, columnWidth: '55%' }
+      },
+      dataLabels: { enabled: false },
+      xaxis: {
+        categories: cycles.map(c => c.cycle),
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      },
+      yaxis: {
+        labels: {
+          formatter: (value) => {
+            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+            if (value >= 1000) return (value / 1000).toFixed(0) + 'k';
+            return String(value);
+          }
+        }
+      },
+      grid: {
+        borderColor: isDark ? '#334155' : '#E2E8F0',
+        strokeDashArray: 4
+      },
+      legend: { position: 'top', horizontalAlign: 'right' },
+      tooltip: { theme: theme }
+    };
+
+    if (this.instances.trends) {
+      this.instances.trends.destroy();
+    }
+
+    container.innerHTML = '';
+    this.instances.trends = new ApexCharts(container, options);
+    this.instances.trends.render();
   }
 
 };

@@ -1,4 +1,5 @@
-/** FinanceOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
+/** financeOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
+
 /**
  * ============================================================================
  * Database Module
@@ -220,6 +221,103 @@ const Database = {
   deleteTransactionRow(rowIndex) {
 
     this.getSheet(CONFIG.SHEETS.LOG).deleteRow(rowIndex);
+
+  },
+
+  /**
+   * Finds the 1-indexed sheet row for an account by name.
+   */
+  findAccountRow(accountName) {
+
+    const sheet = this.getSheet(CONFIG.SHEETS.ACCOUNTS);
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values[0];
+    const nameCol = headers.indexOf('Account Name');
+
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][nameCol] === accountName) {
+        return i + 1;
+      }
+    }
+
+    return -1;
+
+  },
+
+  /**
+   * Appends a single account row.
+   */
+  appendAccountRow(row) {
+
+    this.getSheet(CONFIG.SHEETS.ACCOUNTS).appendRow(row);
+
+  },
+
+  /**
+   * Overwrites an existing account row in place.
+   */
+  updateAccountRow(rowIndex, row) {
+
+    this.getSheet(CONFIG.SHEETS.ACCOUNTS)
+      .getRange(rowIndex, 1, 1, row.length)
+      .setValues([row]);
+
+  },
+
+  /**
+   * Finds the 1-indexed sheet row for a budget line by
+   * (Budget Cycle, Type, Category).
+   */
+  findBudgetRow(cycle, type, category) {
+
+    const sheet = this.getSheet(CONFIG.SHEETS.BUDGET);
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values[0];
+    const cycleCol = headers.indexOf('Budget Cycle');
+    const typeCol = headers.indexOf('Type');
+    const catCol = headers.indexOf('Category');
+
+    for (let i = 1; i < values.length; i++) {
+      if (
+        values[i][cycleCol] === cycle &&
+        values[i][typeCol] === type &&
+        values[i][catCol] === category
+      ) {
+        return i + 1;
+      }
+    }
+
+    return -1;
+
+  },
+
+  /**
+   * Appends a single budget row. For batch inserts (cycle rollover),
+   * use appendBudgetRows instead.
+   */
+  appendBudgetRow(row) {
+
+    this.getSheet(CONFIG.SHEETS.BUDGET).appendRow(row);
+
+  },
+
+  /**
+   * Overwrites an existing budget row in place.
+   */
+  updateBudgetRow(rowIndex, row) {
+
+    this.getSheet(CONFIG.SHEETS.BUDGET)
+      .getRange(rowIndex, 1, 1, row.length)
+      .setValues([row]);
+
+  },
+
+  /**
+   * Deletes a single budget row.
+   */
+  deleteBudgetRow(rowIndex) {
+
+    this.getSheet(CONFIG.SHEETS.BUDGET).deleteRow(rowIndex);
 
   },
 

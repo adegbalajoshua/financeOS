@@ -1,4 +1,5 @@
-/** FinanceOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
+/** financeOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
+
 /**
  * ==========================================
  * FINANCE ENGINE MODULE
@@ -140,12 +141,6 @@ const FinanceEngine = {
   /**
    * Returns the most recent N transactions for a cycle, newest first.
    * Rows are only ever appended (see Database.appendTransaction), so the
-   * tail of the array is already chronological. No date parsing needed
-   * against the display-string Date column.
-   */
-/**
-   * Returns the most recent N transactions for a cycle, newest first.
-   * Rows are only ever appended (see Database.appendTransaction), so the
    * tail of the array is already chronological.
    */
   _getRecentTransactions: function(cycleTransactions, limit) {
@@ -162,5 +157,45 @@ const FinanceEngine = {
         fromAccount: tx['From Account'] || '',
         toAccount: tx['To Account'] || ''
       }));
+  },
+
+
+  /**
+   * Aggregates income/spent/bankCharges/receivables per budget cycle,
+   * across every cycle present in Daily Log, for the multi-cycle trends
+   * view. Cycles are ordered by first appearance (chronological, since
+   * rows are only ever appended).
+   */
+  generateTrendsPayload: function() {
+    const allTransactions = Database.getSheetDataAsObjects(CONFIG.SHEETS.LOG);
+
+    const cycleOrder = [];
+    const cycleMap = {};
+
+    allTransactions.forEach(tx => {
+      const cycle = tx['Budget Cycle'];
+      if (!cycle) return;
+
+      if (!cycleMap[cycle]) {
+        cycleOrder.push(cycle);
+        cycleMap[cycle] = [];
+      }
+      cycleMap[cycle].push(tx);
+    });
+
+    const cycles = cycleOrder.map(cycle => {
+      const summary = this._summarizeCycle(cycleMap[cycle]);
+      return {
+        cycle: cycle,
+        income: summary.totalIncome,
+        spent: summary.totalSpent,
+        bankCharges: summary.bankCharges,
+        receivables: summary.totalReceivables,
+        net: summary.totalIncome - summary.totalSpent - summary.bankCharges
+      };
+    });
+
+    return { cycles: cycles };
   }
+  
 };

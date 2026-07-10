@@ -87,6 +87,10 @@ Editing script files does not update a live Web App deployment automatically. Yo
 - Confirm `payload.expenses` contains entries with `spent > 0`, `buildAnalyticsDashboard` only builds the pie chart if at least one row was written (`expRow > 4`).
 - Re-run **financeOS → Generate Analytics**, the function clears prior charts and data before rebuilding, so a partial failure on a previous run can leave stale state that a fresh run corrects.
 
+## Can't rename an account from the Manage panel
+
+This is intentional, not a bug. `submitAccount` matches existing rows by name. Renaming in place would desync every historical `Daily Log` row that references the old name, silently breaking past balance calculations. To rename, create a new account with the new name and (optionally) deactivate the old one, or edit the sheet cell directly and understand you're accepting that history mismatch.
+
 ## Still stuck?
 
 Open an issue using the Bug Report template, and include the specific module (`Database`, `FinanceEngine`, `API`, `Analytics`, `Automation`, `Gateway`, or frontend) along with the Apps Script execution log.

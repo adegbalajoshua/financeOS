@@ -1,6 +1,4 @@
 <script>
-  /** FinanceOS — ©adegbalajoshua — github.com/adegbalajoshua/financeos — MIT License */
-
 /**
  * ============================================================================
  * Core Application Logic & State Management
@@ -17,16 +15,30 @@ const App = {
     theme: 'light',
     hasInitialized: false,
     modalOpen: false,
-    editingTransactionId: null
+    editingTransactionId: null,
+    manageData: null,
+    manageTab: 'accounts',
+    editingAccountName: null
   },
 
   async init() {
+    this.printSignature();
     this.initTheme();
     this.initFAB();
     this.initModal();
+    this.initTrendsModal();
+    this.initManageModal();
     this.bindEvents();
     
     await this.fetchData();
+  },
+
+  printSignature() {
+    console.log(
+      '%cFinanceOS%c\nBuilt by Adegbala Joshua\nhttps://github.com/<owner>/financeos',
+      'font-size:18px;font-weight:bold;color:#4F46E5;',
+      'font-size:12px;color:#64748B;'
+    );
   },
 
   bindEvents() {
@@ -75,6 +87,9 @@ const App = {
         }
       });
     }
+
+    document.getElementById('trends-btn')?.addEventListener('click', () => this.openTrendsModal());
+    document.getElementById('manage-btn')?.addEventListener('click', () => this.openManageModal());
   },
 
   //==========================================================================
@@ -234,7 +249,317 @@ const App = {
   },
 
   //==========================================================================
-  // Modal & Form Logic
+  // Trends Modal
+  //==========================================================================
+
+  initTrendsModal() {
+    document.getElementById('trends-modal-backdrop')?.addEventListener('click', () => this.closeTrendsModal());
+    document.getElementById('btn-close-trends')?.addEventListener('click', () => this.closeTrendsModal());
+  },
+
+  async openTrendsModal() {
+    const modal = document.getElementById('trends-modal');
+    const panel = document.getElementById('trends-modal-panel');
+    if (!modal || !panel) return;
+
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+      panel.classList.remove('scale-95');
+      panel.classList.add('scale-100');
+    }, 10);
+
+    try {
+      const response = await this.serverCall('fetchTrendsData');
+      if (response.error) throw new Error(response.message);
+
+      if (typeof Charts !== 'undefined') {
+        Charts.renderTrendsChart(response.cycles, this.state.theme);
+      }
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to load trends', 'error');
+      }
+    }
+  },
+
+  closeTrendsModal() {
+    const modal = document.getElementById('trends-modal');
+    const panel = document.getElementById('trends-modal-panel');
+    if (!modal || !panel) return;
+
+    panel.classList.remove('scale-100');
+    panel.classList.add('scale-95');
+    setTimeout(() => {
+      modal.classList.add('opacity-0', 'pointer-events-none');
+    }, 200);
+  },
+
+  //==========================================================================
+  // Manage Modal (Accounts & Budgets)
+  //==========================================================================
+
+  initManageModal() {
+    document.getElementById('manage-modal-backdrop')?.addEventListener('click', () => this.closeManageModal());
+    document.getElementById('btn-close-manage')?.addEventListener('click', () => this.closeManageModal());
+
+    document.getElementById('manage-tab-accounts')?.addEventListener('click', () => this.switchManageTab('accounts'));
+    document.getElementById('manage-tab-budgets')?.addEventListener('click', () => this.switchManageTab('budgets'));
+
+    document.getElementById('manage-accounts-list')?.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.account-edit-btn');
+      const deactivateBtn = e.target.closest('.account-deactivate-btn');
+
+      if (editBtn) this.populateAccountForm(editBtn.dataset.name);
+      if (deactivateBtn) this.handleDeactivateAccount(deactivateBtn.dataset.name);
+    });
+
+    document.getElementById('manage-budgets-list')?.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.budget-edit-btn');
+      const deleteBtn = e.target.closest('.budget-delete-btn');
+
+      if (editBtn) this.populateBudgetForm(editBtn.dataset.type, editBtn.dataset.category, editBtn.dataset.amount);
+      if (deleteBtn) this.handleDeleteBudgetLine(deleteBtn.dataset.type, deleteBtn.dataset.category);
+    });
+
+    document.getElementById('account-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.submitAccountForm();
+    });
+
+    document.getElementById('account-form-reset')?.addEventListener('click', () => this.resetAccountForm());
+
+    document.getElementById('budget-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.submitBudgetForm();
+    });
+
+    document.getElementById('budget-form-reset')?.addEventListener('click', () => this.resetBudgetForm());
+  },
+
+  async openManageModal() {
+    const modal = document.getElementById('manage-modal');
+    const panel = document.getElementById('manage-modal-panel');
+    if (!modal || !panel) return;
+
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+      panel.classList.remove('scale-95');
+      panel.classList.add('scale-100');
+    }, 10);
+
+    await this.refreshManageData();
+  },
+
+  closeManageModal() {
+    const modal = document.getElementById('manage-modal');
+    const panel = document.getElementById('manage-modal-panel');
+    if (!modal || !panel) return;
+
+    panel.classList.remove('scale-100');
+    panel.classList.add('scale-95');
+    setTimeout(() => {
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      this.resetAccountForm();
+      this.resetBudgetForm();
+    }, 200);
+  },
+
+  switchManageTab(tab) {
+    this.state.manageTab = tab;
+
+    const accountsPanel = document.getElementById('manage-panel-accounts');
+    const budgetsPanel = document.getElementById('manage-panel-budgets');
+    const accountsTabBtn = document.getElementById('manage-tab-accounts');
+    const budgetsTabBtn = document.getElementById('manage-tab-budgets');
+
+    const isAccounts = tab === 'accounts';
+
+    accountsPanel.classList.toggle('hidden', !isAccounts);
+    budgetsPanel.classList.toggle('hidden', isAccounts);
+
+    accountsTabBtn.classList.toggle('border-primary', isAccounts);
+    accountsTabBtn.classList.toggle('text-primary', isAccounts);
+    accountsTabBtn.classList.toggle('border-transparent', !isAccounts);
+    accountsTabBtn.classList.toggle('text-slate-500', !isAccounts);
+
+    budgetsTabBtn.classList.toggle('border-primary', !isAccounts);
+    budgetsTabBtn.classList.toggle('text-primary', !isAccounts);
+    budgetsTabBtn.classList.toggle('border-transparent', isAccounts);
+    budgetsTabBtn.classList.toggle('text-slate-500', isAccounts);
+  },
+
+  async refreshManageData() {
+    try {
+      const response = await this.serverCall('fetchManageData');
+      if (response.error) throw new Error(response.message);
+
+      this.state.manageData = response;
+
+      if (typeof Components !== 'undefined') {
+        Components.renderManageAccounts(response.accounts);
+        Components.renderManageBudgets(response.budgets);
+      }
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to load accounts and budgets', 'error');
+      }
+    }
+  },
+
+  populateAccountForm(name) {
+    const account = (this.state.manageData?.accounts || []).find(a => a.name === name);
+    if (!account) return;
+
+    document.getElementById('account-original-name').value = account.name;
+    document.getElementById('account-name').value = account.name;
+    document.getElementById('account-type').value = account.type;
+    document.getElementById('account-balance').value = account.openingBalance;
+    document.getElementById('account-active').checked = account.status === 'Active';
+  },
+
+  resetAccountForm() {
+    document.getElementById('account-form')?.reset();
+    document.getElementById('account-original-name').value = '';
+    document.getElementById('account-active').checked = true;
+  },
+
+  async submitAccountForm() {
+    const originalName = document.getElementById('account-original-name').value;
+    const name = document.getElementById('account-name').value.trim();
+
+    const formData = {
+      name: originalName || name, // updates match on the original name if editing
+      type: document.getElementById('account-type').value,
+      openingBalance: document.getElementById('account-balance').value,
+      status: document.getElementById('account-active').checked ? 'Active' : 'Inactive'
+    };
+
+    // If the name itself changed during an edit, this creates a new row
+    // rather than renaming in place (findAccountRow matches on the
+    // ORIGINAL name). Renaming isn't supported yet, deliberately: renaming
+    // would desync every historical transaction row referencing the old name.
+    if (originalName && originalName !== name) {
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Renaming an account isn\'t supported, it would break historical balances. Create a new account instead.', 'error');
+      }
+      return;
+    }
+
+    if (!originalName) {
+      formData.name = name;
+    }
+
+    try {
+      const response = await this.serverCall('submitAccount', formData);
+      if (response.error) throw new Error(response.message);
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Account saved', 'success');
+      }
+
+      this.resetAccountForm();
+      await this.refreshManageData();
+      this.state.hasInitialized = false;
+      await this.fetchData(true);
+
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to save account', 'error');
+      }
+    }
+  },
+
+  async handleDeactivateAccount(name) {
+    const confirmed = window.confirm(`Deactivate "${name}"? It'll stop appearing in new transaction dropdowns, but its history is preserved.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await this.serverCall('deactivateAccount', name);
+      if (response.error) throw new Error(response.message);
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Account deactivated', 'success');
+      }
+
+      await this.refreshManageData();
+      this.state.hasInitialized = false;
+      await this.fetchData(true);
+
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to deactivate account', 'error');
+      }
+    }
+  },
+
+  populateBudgetForm(type, category, amount) {
+    document.getElementById('budget-type').value = type;
+    document.getElementById('budget-category').value = category;
+    document.getElementById('budget-amount').value = amount;
+  },
+
+  resetBudgetForm() {
+    document.getElementById('budget-form')?.reset();
+  },
+
+  async submitBudgetForm() {
+    const formData = {
+      type: document.getElementById('budget-type').value,
+      category: document.getElementById('budget-category').value.trim(),
+      amount: document.getElementById('budget-amount').value
+    };
+
+    try {
+      const response = await this.serverCall('submitBudgetLine', formData);
+      if (response.error) throw new Error(response.message);
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Budget line saved', 'success');
+      }
+
+      this.resetBudgetForm();
+      await this.refreshManageData();
+      this.state.hasInitialized = false;
+      await this.fetchData(true);
+
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to save budget line', 'error');
+      }
+    }
+  },
+
+  async handleDeleteBudgetLine(type, category) {
+    const confirmed = window.confirm(`Delete the "${category}" budget line?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await this.serverCall('deleteBudgetLine', type, category);
+      if (response.error) throw new Error(response.message);
+
+      if (typeof Components !== 'undefined') {
+        Components.showToast('Budget line deleted', 'success');
+      }
+
+      await this.refreshManageData();
+      this.state.hasInitialized = false;
+      await this.fetchData(true);
+
+    } catch (error) {
+      console.error(error);
+      if (typeof Components !== 'undefined') {
+        Components.showToast(error.message || 'Failed to delete budget line', 'error');
+      }
+    }
+  },
+
+  //==========================================================================
+  // Transaction Modal & Form Logic
   //==========================================================================
 
   initModal() {
@@ -251,10 +576,6 @@ const App = {
     });
   },
 
-  /**
-   * @param {string} type Transaction type.
-   * @param {Object|null} existingTx Pass a recentTransactions item to open in edit mode.
-   */
   openModal(type, existingTx = null) {
     if (!this.state.payload) return;
 
@@ -292,7 +613,7 @@ const App = {
 
       const accountSelect = document.getElementById('tx-account');
       accountSelect.value = existingTx.fromAccount || existingTx.toAccount;
-      accountSelect.dispatchEvent(new Event('change')); // rebuilds + preselects To Account for transfers
+      accountSelect.dispatchEvent(new Event('change'));
     }
 
     modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -319,10 +640,6 @@ const App = {
     }, 200);
   },
 
-  /**
-   * @param {string} type
-   * @param {Object|null} existingTx Optional, ensures the current category survives even if it's not in the standard list for this type.
-   */
   populateModalDropdowns(type, existingTx = null) {
     const categorySelect = document.getElementById('tx-category');
     const accountSelect = document.getElementById('tx-account');

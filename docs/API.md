@@ -64,6 +64,50 @@ Deletes a `Daily Log` row by `Transaction ID` and clears the cache.
 
 **Returns:** `{ success: true }` or `{ error: true, message: string }`.
 
+### `fetchTrendsData()`
+
+Returns income/spent/bankCharges/receivables aggregated per budget cycle, across every cycle present in `Daily Log`. No caching, read-only, cheap to recompute.
+
+**Returns:** `{ cycles: [{ cycle, income, spent, bankCharges, receivables, net }] }`
+
+---
+
+### `fetchManageData()`
+
+Returns all accounts and the active cycle's budget lines, for the Manage panel.
+
+**Returns:** `{ cycle, accounts: [{ name, type, openingBalance, status }], budgets: [{ type, category, amount }] }`
+
+---
+
+### `submitAccount(formData)`
+
+Creates a new account, or updates an existing one matched by `formData.name`. Renaming an existing account (changing `name` while an original name is present) is rejected client-side, see `docs/TROUBLESHOOTING.md`.
+
+**Parameters:** `name`, `type` (`Bank`/`Mobile`/`Cash`/`Savings`), `openingBalance`, `status` (`Active`/`Inactive`)
+
+**Returns:** `{ success: true }` or `{ error: true, message }`
+
+---
+
+### `deactivateAccount(name)`
+
+Sets an account's `Status` to `Inactive`. Never deletes the row.
+
+---
+
+### `submitBudgetLine(formData)`
+
+Creates or updates a budget line for the active cycle, matched by `(type, category)`.
+
+**Parameters:** `type` (`Expense`/`Saving`), `category`, `amount`
+
+---
+
+### `deleteBudgetLine(type, category)`
+
+Removes a budget line from the active cycle.
+
 ## `API` Module (Internal)
 
 Not directly callable from the frontend, `api.js` exposes these methods internally, wrapped by the global endpoints above.
